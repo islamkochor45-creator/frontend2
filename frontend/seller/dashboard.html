@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ярмарка — кабинет продавца</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="logo">Я<span>Р</span>МАРКА</div>
+  <nav class="main-nav">
+    <a href="../index.html">Каталог</a>
+    <a href="dashboard.html" class="active">Кабинет продавца</a>
+  </nav>
+  <div class="header-actions"><div id="userSlot"></div></div>
+</header>
+
+<main class="wrap seller-page">
+  <h1>Кабинет продавца</h1>
+
+  <div class="stat-row" id="statRow">
+    <div class="stat-card"><div class="num">—</div><div class="label">Товаров</div></div>
+    <div class="stat-card"><div class="num">—</div><div class="label">Продаж</div></div>
+    <div class="stat-card"><div class="num">—</div><div class="label">Выручка</div></div>
+  </div>
+
+  <div class="seller-tabs">
+    <button class="chip active" data-tab="products">Мои товары</button>
+    <button class="chip" data-tab="orders">Заказы с моими товарами</button>
+  </div>
+
+  <div id="tabProducts">
+    <button class="btn-primary" id="newProductBtn" style="margin-bottom:20px;">+ Добавить товар</button>
+
+    <div class="checkout-block" id="productForm" style="display:none;">
+      <h2>Новый товар</h2>
+      <div class="new-address-form open">
+        <input type="text" id="pName" placeholder="Название товара">
+        <input type="text" id="pPrice" placeholder="Цена, ₽">
+        <input type="text" id="pStock" placeholder="Остаток на складе">
+        <input type="text" id="pCategory" placeholder="Категория">
+        <textarea id="pDesc" placeholder="Описание" style="padding:11px 12px; border-radius:8px; background:var(--ink); border:1px solid var(--line); color:var(--bone); font-family:'Manrope',sans-serif; font-size:13px; min-height:70px;"></textarea>
+        <button type="button" class="btn-primary" id="saveProductBtn" style="align-self:flex-start;">Сохранить товар</button>
+      </div>
+    </div>
+
+    <table class="seller-table" id="productsTable" style="display:none;">
+      <thead><tr><th>Товар</th><th>Цена</th><th>Остаток</th><th></th></tr></thead>
+      <tbody id="productsBody"></tbody>
+    </table>
+    <div id="productsState" class="state-msg">Загружаем товары…</div>
+  </div>
+
+  <div id="tabOrders" style="display:none;">
+    <table class="seller-table" id="ordersTable" style="display:none;">
+      <thead><tr><th>Заказ</th><th>Товар</th><th>Кол-во</th><th>Статус</th></tr></thead>
+      <tbody id="ordersBody"></tbody>
+    </table>
+    <div id="ordersState" class="state-msg">Загружаем заказы…</div>
+  </div>
+</main>
+
+<script type="module">
+  import { api } from '../js/api.js';
+  import { initHeader } from '../js/header.js';
+  import { initWidgets } from '../js/widgets.js';
+
+  initHeader();
+  initWidgets();
+
+  const fmt = n => new Intl.NumberFormat('ru-RU').format(n) + ' ₽';
+
+  async function loadStats() {
+    try {
+      const stats = await api.getSellerStats();
+      const cards = document.querySelectorAll('#statRow .stat-card .num');
+      cards[0].textContent = stats.products_count ?? '—';
+      cards[1].textContent = stats.sales_count ?? '—';
+      cards[2].textContent = stats.revenue != null ? fmt(stats.revenue) : '—';
+    } catch (_) { /* статистика необязательна для работы кабинета */ }
+  }
+
+  async function loadProducts() {
+    const table = document.getElementById('productsTable');
+    const body = document.getElementById('productsBody');
+    const state = document.getElementById('productsState');
+    try {
+      const data = await api.getMyProducts();
+      const items = Array.isArray(data) ? data : (data.results || []);
+      if (!items.length) {
+        state.textContent = 'У вас пока нет товаров — добавьте первый';
+        table.style.display = 'none';
+        return;
+      }
+      body.innerHTML = items.map(p => `
+        <tr>
+          <td>${p.name || p.title}</td>
+          <td>${fmt(p.price)}</td>
+          <td>${p.stock ?? '—'}</td>
+          <td><a href="../product.html?id=${p.id}" style="color:var(--gold); font-size:13px;">Открыть →</a></td>
+        </tr>
+      `).join('');
+      table.style.display = 'table';
+      state.style.display = 'none';
+    } catch (err) {
+      state.textContent = `Не удалось загрузить товары: ${err.message || 'ошибка сервера'}`;
+      state.classList.add('error');
+    }
+  }
+
+  async function loadSellerOrders() {
+    const table = document.getElementById('ordersTable');
+    const body = document.getElementById('ordersBody');
+    const state = document.getElementById('ordersState');
+    try {
+      const data = await api.getSellerOrders();
+      const items = Array.isArray(data) ? data : (data.results || []);
+      if (!items.length) {
+        state.textContent = 'Пока нет заказов с вашими товарами';
+        return;
+      }
+      body.innerHTML = items.map(i => `
+        <tr>
+          <td>#${i.order_id || i.order}</td>
+          <td>${(i.product && (i.product.name || i.product.title)) || '—'}</td>
+          <td>${i.quantity}</td>
+          <td>${i.status || '—'}</td>
+        </tr>
+      `).join('');
+      table.style.display = 'table';
+      state.style.display = 'none';
+    } catch (err) {
+      state.textContent = `Не удалось загрузить заказы: ${err.message || 'ошибка сервера'}`;
+      state.classList.add('error');
+    }
+  }
+
+  document.querySelectorAll('.seller-tabs .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.seller-tabs .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      const tab = chip.dataset.tab;
+      document.getElementById('tabProducts').style.display = tab === 'products' ? 'block' : 'none';
+      document.getElementById('tabOrders').style.display = tab === 'orders' ? 'block' : 'none';
+      if (tab === 'orders') loadSellerOrders();
+    });
+  });
+
+  document.getElementById('newProductBtn').addEventListener('click', () => {
+    document.getElementById('productForm').style.display = 'block';
+  });
+
+  document.getElementById('saveProductBtn').addEventListener('click', async () => {
+    const payload = {
+      name: document.getElementById('pName').value.trim(),
+      price: parseFloat(document.getElementById('pPrice').value),
+      stock: parseInt(document.getElementById('pStock').value, 10) || 0,
+      category: document.getElementById('pCategory').value.trim(),
+      description: document.getElementById('pDesc').value.trim(),
+    };
+    if (!payload.name || !payload.price) { alert('Укажите хотя бы название и цену'); return; }
+    const btn = document.getElementById('saveProductBtn');
+    btn.disabled = true; btn.textContent = 'Сохраняем…';
+    try {
+      await api.createProduct(payload);
+      document.getElementById('productForm').style.display = 'none';
+      loadProducts();
+      loadStats();
+    } catch (err) {
+      alert(err.message || 'Не удалось создать товар');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Сохранить товар';
+    }
+  });
+
+  loadStats();
+  loadProducts();
+</script>
+
+</body>
+</html>

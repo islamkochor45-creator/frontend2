@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ярмарка — корзина</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="logo">Я<span>Р</span>МАРКА</div>
+  <nav class="main-nav">
+    <a href="index.html">Каталог</a>
+    <a href="cart.html" class="active">Корзина</a>
+    <a href="wishlist.html">Избранное</a>
+    <a href="orders.html">Заказы</a>
+  </nav>
+  <div class="header-actions">
+    <div id="userSlot"></div>
+    <a href="cart.html" class="cart-btn">
+      Корзина
+      <span class="cart-badge" id="cartBadge">0</span>
+    </a>
+  </div>
+</header>
+
+<main class="wrap cart-page">
+  <h1>Корзина</h1>
+  <div id="cartContent">
+    <div class="state-msg">Загружаем корзину…</div>
+  </div>
+</main>
+
+<script type="module">
+  import { api } from './js/api.js';
+  import { initHeader } from './js/header.js';
+  import { initWidgets } from './js/widgets.js';
+
+  initHeader();
+  initWidgets();
+
+  const content = document.getElementById('cartContent');
+  const fmt = n => new Intl.NumberFormat('ru-RU').format(n) + ' ₽';
+
+  async function loadCart() {
+    if (!api.isLoggedIn()) {
+      content.innerHTML = `<div class="state-msg">Войдите, чтобы увидеть корзину. <a href="login.html" style="color:var(--gold)">Войти →</a></div>`;
+      return;
+    }
+    content.innerHTML = '<div class="state-msg">Загружаем корзину…</div>';
+    try {
+      const cart = await api.getCart();
+      renderCart(cart);
+    } catch (err) {
+      content.innerHTML = `<div class="state-msg error">Не удалось загрузить корзину: ${err.message || 'ошибка сервера'}</div>`;
+    }
+  }
+
+  function renderCart(cart) {
+    const items = cart.items || [];
+    if (!items.length) {
+      content.innerHTML = `<div class="state-msg">Корзина пуста. <a href="index.html" style="color:var(--gold)">В каталог →</a></div>`;
+      return;
+    }
+
+    const total = items.reduce((sum, i) => sum + (i.product.price * i.quantity), 0);
+
+    content.innerHTML = `
+      <div class="cart-layout">
+        <div class="cart-items">
+          ${items.map(i => itemRow(i)).join('')}
+        </div>
+        <div class="cart-summary">
+          <h2>Итого</h2>
+          <div class="summary-row"><span>Товаров</span><span>${items.reduce((s, i) => s + i.quantity, 0)}</span></div>
+          <div class="summary-row total"><span>К оплате</span><span>${fmt(total)}</span></div>
+          <button class="btn-primary" style="width:100%; margin-top:18px;" id="checkoutBtn">Оформить заказ</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('checkoutBtn').addEventListener('click', handleCheckout);
+
+    content.querySelectorAll('.qty-control [data-action]').forEach(btn => {
+      btn.addEventListener('click', () => handleQtyChange(btn));
+    });
+    content.querySelectorAll('.cart-item-remove').forEach(btn => {
+      btn.addEventListener('click', () => handleRemove(btn));
+    });
+  }
+
+  function itemRow(item) {
+    const p = item.product;
+    const image = p.image || 'https://picsum.photos/seed/cart' + p.id + '/200/200';
+    return `
+      <div class="cart-item" data-item-id="${item.id}">
+        <img src="${image}" alt="${p.name || p.title}">
+        <div>
+          <div class="cart-item-title">${p.name || p.title}</div>
+          ${p.seller_name ? `<div class="cart-item-seller">${p.seller_name}</div>` : ''}
+        </div>
+        <div class="qty-control">
+          <button data-action="dec">−</button>
+          <span>${item.quantity}</span>
+          <button data-action="inc">+</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div class="cart-item-price">${fmt(p.price * item.quantity)}</div>
+          <button class="btn-danger cart-item-remove">Убрать</button>
+        </div>
+      </div>
+    `;
+  }
+
+  async function handleQtyChange(btn) {
+    const row = btn.closest('.cart-item');
+    const itemId = row.dataset.itemId;
+    const qtySpan = row.querySelector('.qty-control span');
+    let qty = parseInt(qtySpan.textContent, 10);
+    qty = btn.dataset.action === 'inc' ? qty + 1 : qty - 1;
+
+    if (qty < 1) {
+      await handleRemoveById(itemId);
+      return;
+    }
+
+    try {
+      await api.updateCartItem(itemId, qty);
+      await loadCart();
+      await initHeader();
+    } catch (err) {
+      // при ошибке — просто перезагружаем актуальное состояние
+      await loadCart();
+    }
+  }
+
+  async function handleRemove(btn) {
+    const row = btn.closest('.cart-item');
+    await handleRemoveById(row.dataset.itemId);
+  }
+
+  async function handleRemoveById(itemId) {
+    try {
+      await api.removeCartItem(itemId);
+    } finally {
+      await loadCart();
+      await initHeader();
+    }
+  }
+
+  async function handleCheckout() {
+    window.location.href = 'checkout.html';
+  }
+
+  loadCart();
+</script>
+
+</body>
+</html>

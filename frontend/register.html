@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ярмарка — регистрация</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="logo">Я<span>Р</span>МАРКА</div>
+  <nav class="main-nav">
+    <a href="index.html">Каталог</a>
+    <a href="cart.html">Корзина</a>
+    <a href="wishlist.html">Избранное</a>
+    <a href="orders.html">Заказы</a>
+  </nav>
+  <div class="header-actions">
+    <div id="userSlot"></div>
+  </div>
+</header>
+
+<main class="auth-shell">
+  <div class="auth-card">
+    <h1>Регистрация</h1>
+    <p class="hint">Создайте аккаунт, чтобы покупать и добавлять товары в избранное</p>
+
+    <div class="form-error" id="formError"></div>
+    <div class="form-success" id="formSuccess">Готово! Проверьте почту для подтверждения и войдите в аккаунт.</div>
+
+    <form id="registerForm" novalidate>
+      <div class="field" id="fEmail">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required autocomplete="email">
+        <div class="field-error">Введите корректный email</div>
+      </div>
+      <div class="field" id="fPassword">
+        <label for="password">Пароль</label>
+        <input type="password" id="password" name="password" required autocomplete="new-password">
+        <div class="field-error">Минимум 8 символов</div>
+      </div>
+      <div class="field" id="fPassword2">
+        <label for="password2">Повторите пароль</label>
+        <input type="password" id="password2" name="password2" required autocomplete="new-password">
+        <div class="field-error">Пароли не совпадают</div>
+      </div>
+      <button type="submit" class="btn-primary" style="width:100%;" id="submitBtn">Создать аккаунт</button>
+    </form>
+
+    <div class="auth-switch">Уже есть аккаунт? <a href="login.html">Войти</a></div>
+  </div>
+</main>
+
+<script type="module">
+  import { api } from './js/api.js';
+  import { initHeader } from './js/header.js';
+  import { initWidgets } from './js/widgets.js';
+
+  initHeader();
+  initWidgets();
+
+  const form = document.getElementById('registerForm');
+  const formError = document.getElementById('formError');
+  const formSuccess = document.getElementById('formSuccess');
+  const submitBtn = document.getElementById('submitBtn');
+
+  function setFieldError(fieldId, has) {
+    document.getElementById(fieldId).classList.toggle('error', has);
+  }
+
+  function validate() {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const password2 = document.getElementById('password2').value;
+    let ok = true;
+
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    setFieldError('fEmail', !emailValid);
+    if (!emailValid) ok = false;
+
+    const passValid = password.length >= 8;
+    setFieldError('fPassword', !passValid);
+    if (!passValid) ok = false;
+
+    const matchValid = password === password2 && password2.length > 0;
+    setFieldError('fPassword2', !matchValid);
+    if (!matchValid) ok = false;
+
+    return ok;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    formError.classList.remove('show');
+    formSuccess.classList.remove('show');
+    if (!validate()) return;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Создаём…';
+
+    try {
+      await api.register({
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        password2: document.getElementById('password2').value,
+      });
+      formSuccess.classList.add('show');
+      form.reset();
+      setTimeout(() => { window.location.href = 'login.html'; }, 1600);
+    } catch (err) {
+      formError.textContent = err.message || 'Не удалось зарегистрироваться';
+      formError.classList.add('show');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Создать аккаунт';
+    }
+  });
+</script>
+
+</body>
+</html>

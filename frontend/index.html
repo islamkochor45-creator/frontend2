@@ -1,84 +1,87 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ярмарка — каталог</title>
-<link rel="stylesheet" href="css/style.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ярмарка — каталог</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="logo">Я<span>Р</span>МАРКА</div>
+      <nav class="main-nav">
+        <a href="index.html" class="active">Каталог</a>
+        <a href="cart.html">Корзина</a>
+        <a href="wishlist.html">Избранное</a>
+        <a href="orders.html">Заказы</a>
+        <a href="seller/dashboard.html">Продавец</a>
+      </nav>
+      <div class="header-actions">
+        <div id="userSlot"></div>
+        <a href="cart.html" class="cart-btn">
+          Корзина
+          <span class="cart-badge" id="cartBadge">0</span>
+        </a>
+      </div>
+    </header>
 
-<header class="site-header">
-  <div class="logo">Я<span>Р</span>МАРКА</div>
-  <nav class="main-nav">
-    <a href="index.html" class="active">Каталог</a>
-    <a href="cart.html">Корзина</a>
-    <a href="wishlist.html">Избранное</a>
-    <a href="orders.html">Заказы</a>
-  </nav>
-  <div class="header-actions">
-    <div id="userSlot"></div>
-    <a href="cart.html" class="cart-btn">
-      Корзина
-      <span class="cart-badge" id="cartBadge">0</span>
-    </a>
-  </div>
-</header>
+    <main class="wrap">
+      <div class="filters">
+        <h1>Каталог</h1>
+        <div class="chips" id="chips">
+          <button class="chip active" data-cat="">Всё</button>
+          <button class="chip" data-cat="handmade">Хендмейд</button>
+          <button class="chip" data-cat="home">Дом</button>
+          <button class="chip" data-cat="clothes">Одежда</button>
+          <button class="chip" data-cat="vintage">Винтаж</button>
+        </div>
+      </div>
 
-<main class="wrap">
-  <div class="filters">
-    <h1>Каталог</h1>
-    <div class="chips" id="chips">
-      <button class="chip active" data-cat="">Всё</button>
-      <button class="chip" data-cat="handmade">Хендмейд</button>
-      <button class="chip" data-cat="home">Дом</button>
-      <button class="chip" data-cat="clothes">Одежда</button>
-      <button class="chip" data-cat="vintage">Винтаж</button>
-    </div>
-  </div>
+      <div id="grid" class="grid">
+        <div class="state-msg">Загружаем товары…</div>
+      </div>
+    </main>
 
-  <div id="grid" class="grid">
-    <div class="state-msg">Загружаем товары…</div>
-  </div>
-</main>
+    <script type="module">
+      import { api } from "./js/api.js";
+      import { initHeader } from "./js/header.js";
+      import { initWidgets } from "./js/widgets.js";
 
-<script type="module">
-  import { api } from './js/api.js';
-  import { initHeader } from './js/header.js';
-  import { initWidgets } from './js/widgets.js';
+      initHeader();
+      initWidgets();
 
-  initHeader();
-  initWidgets();
+      const grid = document.getElementById("grid");
+      const fmt = (n) => new Intl.NumberFormat("ru-RU").format(n) + " ₽";
+      let currentCat = "";
 
-  const grid = document.getElementById('grid');
-  const fmt = n => new Intl.NumberFormat('ru-RU').format(n) + ' ₽';
-  let currentCat = '';
+      async function loadProducts() {
+        grid.innerHTML = '<div class="state-msg">Загружаем товары…</div>';
+        try {
+          const params = currentCat ? { category: currentCat } : {};
+          const data = await api.getProducts(params);
+          // ожидаем либо { results: [...] } (пагинация DRF), либо просто массив
+          const items = Array.isArray(data) ? data : data.results || [];
+          renderProducts(items);
+        } catch (err) {
+          grid.innerHTML = `<div class="state-msg error">Не удалось загрузить товары: ${err.message || "ошибка сервера"}</div>`;
+        }
+      }
 
-  async function loadProducts() {
-    grid.innerHTML = '<div class="state-msg">Загружаем товары…</div>';
-    try {
-      const params = currentCat ? { category: currentCat } : {};
-      const data = await api.getProducts(params);
-      // ожидаем либо { results: [...] } (пагинация DRF), либо просто массив
-      const items = Array.isArray(data) ? data : (data.results || []);
-      renderProducts(items);
-    } catch (err) {
-      grid.innerHTML = `<div class="state-msg error">Не удалось загрузить товары: ${err.message || 'ошибка сервера'}</div>`;
-    }
-  }
-
-  function renderProducts(items) {
-    if (!items.length) {
-      grid.innerHTML = '<div class="state-msg">Товаров пока нет</div>';
-      return;
-    }
-    grid.innerHTML = '';
-    items.forEach(p => {
-      const card = document.createElement('div');
-      card.className = 'card';
-      const image = p.image || (p.images && p.images[0] && p.images[0].image) || 'https://picsum.photos/seed/placeholder/600/750';
-      const seller = p.seller_name || (p.seller && p.seller.name) || '';
-      card.innerHTML = `
+      function renderProducts(items) {
+        if (!items.length) {
+          grid.innerHTML = '<div class="state-msg">Товаров пока нет</div>';
+          return;
+        }
+        grid.innerHTML = "";
+        items.forEach((p) => {
+          const card = document.createElement("div");
+          card.className = "card";
+          const image =
+            p.image ||
+            (p.images && p.images[0] && p.images[0].image) ||
+            "https://picsum.photos/seed/placeholder/600/750";
+          const seller = p.seller_name || (p.seller && p.seller.name) || "";
+          card.innerHTML = `
         <div class="card-media">
           <a href="product.html?id=${p.id}">
             <img src="${image}" alt="${p.name || p.title}" loading="lazy">
@@ -86,7 +89,7 @@
           <button class="wish-btn" data-id="${p.id}">♡</button>
         </div>
         <div class="card-body">
-          ${seller ? `<div class="card-seller">${seller}</div>` : ''}
+          ${seller ? `<div class="card-seller">${seller}</div>` : ""}
           <a href="product.html?id=${p.id}" class="card-title" style="color:inherit;">${p.name || p.title}</a>
           <div class="card-footer">
             <div class="card-price">${fmt(p.price)}</div>
@@ -94,60 +97,70 @@
           </div>
         </div>
       `;
-      grid.appendChild(card);
-    });
-  }
-
-  grid.addEventListener('click', async (e) => {
-    if (e.target.classList.contains('wish-btn')) {
-      if (!api.isLoggedIn()) { window.location.href = 'login.html'; return; }
-      const btn = e.target;
-      btn.classList.add('pulse');
-      setTimeout(() => btn.classList.remove('pulse'), 500);
-      const active = btn.classList.toggle('active');
-      btn.textContent = active ? '♥' : '♡';
-      try {
-        if (active) {
-          await api.addWishlist(btn.dataset.id);
-        }
-        // упрощённо: снятие с избранного прямо из каталога делаем через страницу wishlist,
-        // здесь просто отправляем добавление
-      } catch (err) {
-        btn.classList.remove('active');
-        btn.textContent = '♡';
+          grid.appendChild(card);
+        });
       }
-      return;
-    }
-    if (!e.target.classList.contains('card-add')) return;
-    if (!api.isLoggedIn()) {
-      window.location.href = 'login.html';
-      return;
-    }
-    const btn = e.target;
-    const id = btn.dataset.id;
-    btn.disabled = true;
-    btn.textContent = '...';
-    try {
-      await api.addCartItem(id, 1);
-      await initHeader();
-      btn.textContent = 'Добавлено';
-      setTimeout(() => { btn.textContent = 'В корзину'; btn.disabled = false; }, 900);
-    } catch (err) {
-      btn.textContent = 'Ошибка';
-      setTimeout(() => { btn.textContent = 'В корзину'; btn.disabled = false; }, 1200);
-    }
-  });
 
-  document.getElementById('chips').addEventListener('click', (e) => {
-    if (!e.target.classList.contains('chip')) return;
-    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-    e.target.classList.add('active');
-    currentCat = e.target.dataset.cat;
-    loadProducts();
-  });
+      grid.addEventListener("click", async (e) => {
+        if (e.target.classList.contains("wish-btn")) {
+          if (!api.isLoggedIn()) {
+            window.location.href = "login.html";
+            return;
+          }
+          const btn = e.target;
+          btn.classList.add("pulse");
+          setTimeout(() => btn.classList.remove("pulse"), 500);
+          const active = btn.classList.toggle("active");
+          btn.textContent = active ? "♥" : "♡";
+          try {
+            if (active) {
+              await api.addWishlist(btn.dataset.id);
+            }
+            // упрощённо: снятие с избранного прямо из каталога делаем через страницу wishlist,
+            // здесь просто отправляем добавление
+          } catch (err) {
+            btn.classList.remove("active");
+            btn.textContent = "♡";
+          }
+          return;
+        }
+        if (!e.target.classList.contains("card-add")) return;
+        if (!api.isLoggedIn()) {
+          window.location.href = "login.html";
+          return;
+        }
+        const btn = e.target;
+        const id = btn.dataset.id;
+        btn.disabled = true;
+        btn.textContent = "...";
+        try {
+          await api.addCartItem(id, 1);
+          await initHeader();
+          btn.textContent = "Добавлено";
+          setTimeout(() => {
+            btn.textContent = "В корзину";
+            btn.disabled = false;
+          }, 900);
+        } catch (err) {
+          btn.textContent = "Ошибка";
+          setTimeout(() => {
+            btn.textContent = "В корзину";
+            btn.disabled = false;
+          }, 1200);
+        }
+      });
 
-  loadProducts();
-</script>
+      document.getElementById("chips").addEventListener("click", (e) => {
+        if (!e.target.classList.contains("chip")) return;
+        document
+          .querySelectorAll(".chip")
+          .forEach((c) => c.classList.remove("active"));
+        e.target.classList.add("active");
+        currentCat = e.target.dataset.cat;
+        loadProducts();
+      });
 
-</body>
+      loadProducts();
+    </script>
+  </body>
 </html>

@@ -1,97 +1,108 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ярмарка — товар</title>
-<link rel="stylesheet" href="css/style.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ярмарка — товар</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="logo">Я<span>Р</span>МАРКА</div>
+      <nav class="main-nav">
+        <a href="index.html">Каталог</a>
+        <a href="cart.html">Корзина</a>
+        <a href="wishlist.html">Избранное</a>
+        <a href="orders.html">Заказы</a>
+      </nav>
+      <div class="header-actions">
+        <div id="userSlot"></div>
+        <a href="cart.html" class="cart-btn"
+          >Корзина<span class="cart-badge" id="cartBadge">0</span></a
+        >
+      </div>
+    </header>
 
-<header class="site-header">
-  <div class="logo">Я<span>Р</span>МАРКА</div>
-  <nav class="main-nav">
-    <a href="index.html">Каталог</a>
-    <a href="cart.html">Корзина</a>
-    <a href="wishlist.html">Избранное</a>
-    <a href="orders.html">Заказы</a>
-  </nav>
-  <div class="header-actions">
-    <div id="userSlot"></div>
-    <a href="cart.html" class="cart-btn">Корзина<span class="cart-badge" id="cartBadge">0</span></a>
-  </div>
-</header>
+    <main class="wrap">
+      <div id="productContent">
+        <div class="state-msg">Загружаем товар…</div>
+      </div>
+    </main>
 
-<main class="wrap">
-  <div id="productContent"><div class="state-msg">Загружаем товар…</div></div>
-</main>
+    <script type="module">
+      import { api } from "./js/api.js";
+      import { initHeader } from "./js/header.js";
+      import { initWidgets } from "./js/widgets.js";
 
-<script type="module">
-  import { api } from './js/api.js';
-  import { initHeader } from './js/header.js';
-  import { initWidgets } from './js/widgets.js';
+      initHeader();
+      initWidgets();
 
-  initHeader();
-  initWidgets();
+      const fmt = (n) => new Intl.NumberFormat("ru-RU").format(n) + " ₽";
+      const content = document.getElementById("productContent");
+      const params = new URLSearchParams(window.location.search);
+      const productId = params.get("id");
 
-  const fmt = n => new Intl.NumberFormat('ru-RU').format(n) + ' ₽';
-  const content = document.getElementById('productContent');
-  const params = new URLSearchParams(window.location.search);
-  const productId = params.get('id');
+      let wishlistEntryId = null;
 
-  let wishlistEntryId = null;
+      async function load() {
+        if (!productId) {
+          content.innerHTML =
+            '<div class="state-msg error">Товар не найден</div>';
+          return;
+        }
+        try {
+          const [product, reviews] = await Promise.all([
+            api.getProduct(productId),
+            api.getReviews(productId).catch(() => []),
+          ]);
+          render(
+            product,
+            Array.isArray(reviews) ? reviews : reviews.results || [],
+          );
+        } catch (err) {
+          content.innerHTML = `<div class="state-msg error">Не удалось загрузить товар: ${err.message || "ошибка сервера"}</div>`;
+        }
+      }
 
-  async function load() {
-    if (!productId) {
-      content.innerHTML = '<div class="state-msg error">Товар не найден</div>';
-      return;
-    }
-    try {
-      const [product, reviews] = await Promise.all([
-        api.getProduct(productId),
-        api.getReviews(productId).catch(() => []),
-      ]);
-      render(product, Array.isArray(reviews) ? reviews : (reviews.results || []));
-    } catch (err) {
-      content.innerHTML = `<div class="state-msg error">Не удалось загрузить товар: ${err.message || 'ошибка сервера'}</div>`;
-    }
-  }
+      function render(p, reviews) {
+        const images =
+          p.images && p.images.length
+            ? p.images.map((i) => i.image)
+            : [p.image || `https://picsum.photos/seed/p${p.id}/700/850`];
+        const avg = p.avg_rating || 0;
+        const starsStr =
+          "★".repeat(Math.round(avg)) + "☆".repeat(5 - Math.round(avg));
 
-  function render(p, reviews) {
-    const images = p.images && p.images.length ? p.images.map(i => i.image) : [p.image || `https://picsum.photos/seed/p${p.id}/700/850`];
-    const avg = p.avg_rating || 0;
-    const starsStr = '★'.repeat(Math.round(avg)) + '☆'.repeat(5 - Math.round(avg));
-
-    content.innerHTML = `
+        content.innerHTML = `
       <div class="product-layout">
         <div class="product-gallery">
           <div class="product-gallery-main">
             <img id="mainImg" src="${images[0]}" alt="${p.name || p.title}">
           </div>
-          ${images.length > 1 ? `<div class="product-thumbs">${images.map((src, i) => `<img src="${src}" class="${i === 0 ? 'active' : ''}" data-src="${src}">`).join('')}</div>` : ''}
+          ${images.length > 1 ? `<div class="product-thumbs">${images.map((src, i) => `<img src="${src}" class="${i === 0 ? "active" : ""}" data-src="${src}">`).join("")}</div>` : ""}
         </div>
         <div class="product-info">
-          ${p.seller_name ? `<div class="product-info-seller">${p.seller_name}</div>` : ''}
+          ${p.seller_name ? `<div class="product-info-seller">${p.seller_name}</div>` : ""}
           <h1>${p.name || p.title}</h1>
           <div class="product-rating"><span class="stars">${starsStr}</span> ${avg.toFixed ? avg.toFixed(1) : avg} · ${p.reviews_count || reviews.length} отзывов</div>
           <div class="product-info-price">${fmt(p.price)}</div>
-          <p class="product-info-desc">${p.description || 'Описание скоро появится.'}</p>
+          <p class="product-info-desc">${p.description || "Описание скоро появится."}</p>
           <div class="product-actions">
             <button class="btn-primary" id="addToCartBtn">В корзину</button>
             <button class="wish-btn" id="wishBtn" style="position:static;">♡</button>
           </div>
-          <div class="product-stock ${p.stock === 0 ? 'low' : ''}">${p.stock > 0 ? `В наличии: ${p.stock} шт.` : 'Нет в наличии'}</div>
+          <div class="product-stock ${p.stock === 0 ? "low" : ""}">${p.stock > 0 ? `В наличии: ${p.stock} шт.` : "Нет в наличии"}</div>
         </div>
       </div>
 
       <div class="reviews-section">
         <h2>Отзывы</h2>
         <div id="reviewsList">
-          ${reviews.length ? reviews.map(reviewCard).join('') : '<div class="state-msg">Пока нет отзывов — будьте первым</div>'}
+          ${reviews.length ? reviews.map(reviewCard).join("") : '<div class="state-msg">Пока нет отзывов — будьте первым</div>'}
         </div>
         <form class="review-form" id="reviewForm">
           <div class="star-picker" id="starPicker">
-            ${[1,2,3,4,5].map(n => `<span data-val="${n}">★</span>`).join('')}
+            ${[1, 2, 3, 4, 5].map((n) => `<span data-val="${n}">★</span>`).join("")}
           </div>
           <textarea id="reviewText" placeholder="Поделитесь впечатлением о товаре…"></textarea>
           <button type="submit" class="btn-primary" style="align-self:flex-start;">Оставить отзыв</button>
@@ -99,118 +110,157 @@
       </div>
     `;
 
-    // галерея
-    content.querySelectorAll('.product-thumbs img').forEach(thumb => {
-      thumb.addEventListener('click', () => {
-        document.getElementById('mainImg').src = thumb.dataset.src;
-        content.querySelectorAll('.product-thumbs img').forEach(t => t.classList.remove('active'));
-        thumb.classList.add('active');
-      });
-    });
+        // галерея
+        content.querySelectorAll(".product-thumbs img").forEach((thumb) => {
+          thumb.addEventListener("click", () => {
+            document.getElementById("mainImg").src = thumb.dataset.src;
+            content
+              .querySelectorAll(".product-thumbs img")
+              .forEach((t) => t.classList.remove("active"));
+            thumb.classList.add("active");
+          });
+        });
 
-    // корзина
-    document.getElementById('addToCartBtn').addEventListener('click', async (e) => {
-      if (!api.isLoggedIn()) { window.location.href = 'login.html'; return; }
-      const btn = e.target;
-      btn.disabled = true; btn.textContent = '...';
-      try {
-        await api.addCartItem(p.id, 1);
-        await initHeader();
-        btn.textContent = 'Добавлено ✓';
-        setTimeout(() => { btn.textContent = 'В корзину'; btn.disabled = false; }, 1000);
-      } catch (err) {
-        btn.textContent = 'Ошибка';
-        setTimeout(() => { btn.textContent = 'В корзину'; btn.disabled = false; }, 1200);
+        // корзина
+        document
+          .getElementById("addToCartBtn")
+          .addEventListener("click", async (e) => {
+            if (!api.isLoggedIn()) {
+              window.location.href = "login.html";
+              return;
+            }
+            const btn = e.target;
+            btn.disabled = true;
+            btn.textContent = "...";
+            try {
+              await api.addCartItem(p.id, 1);
+              await initHeader();
+              btn.textContent = "Добавлено ✓";
+              setTimeout(() => {
+                btn.textContent = "В корзину";
+                btn.disabled = false;
+              }, 1000);
+            } catch (err) {
+              btn.textContent = "Ошибка";
+              setTimeout(() => {
+                btn.textContent = "В корзину";
+                btn.disabled = false;
+              }, 1200);
+            }
+          });
+
+        // избранное
+        initWishlistState(p.id);
+
+        // рейтинг в форме
+        let selectedRating = 0;
+        const stars = document.querySelectorAll("#starPicker span");
+        stars.forEach((s) => {
+          s.addEventListener("click", () => {
+            selectedRating = parseInt(s.dataset.val, 10);
+            stars.forEach((st) =>
+              st.classList.toggle(
+                "active",
+                parseInt(st.dataset.val, 10) <= selectedRating,
+              ),
+            );
+          });
+        });
+
+        document
+          .getElementById("reviewForm")
+          .addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (!api.isLoggedIn()) {
+              window.location.href = "login.html";
+              return;
+            }
+            const text = document.getElementById("reviewText").value.trim();
+            if (!text || !selectedRating) return;
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Отправляем…";
+            try {
+              const review = await api.createReview(p.id, {
+                product: p.id,
+                rating: selectedRating,
+                text,
+              });
+              const list = document.getElementById("reviewsList");
+              if (list.querySelector(".state-msg")) list.innerHTML = "";
+              list.insertAdjacentHTML("afterbegin", reviewCard(review));
+              e.target.reset();
+              stars.forEach((st) => st.classList.remove("active"));
+              selectedRating = 0;
+            } catch (err) {
+              alert(err.message || "Не удалось отправить отзыв");
+            } finally {
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Оставить отзыв";
+            }
+          });
       }
-    });
 
-    // избранное
-    initWishlistState(p.id);
-
-    // рейтинг в форме
-    let selectedRating = 0;
-    const stars = document.querySelectorAll('#starPicker span');
-    stars.forEach(s => {
-      s.addEventListener('click', () => {
-        selectedRating = parseInt(s.dataset.val, 10);
-        stars.forEach(st => st.classList.toggle('active', parseInt(st.dataset.val, 10) <= selectedRating));
-      });
-    });
-
-    document.getElementById('reviewForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      if (!api.isLoggedIn()) { window.location.href = 'login.html'; return; }
-      const text = document.getElementById('reviewText').value.trim();
-      if (!text || !selectedRating) return;
-      const submitBtn = e.target.querySelector('button[type="submit"]');
-      submitBtn.disabled = true; submitBtn.textContent = 'Отправляем…';
-      try {
-        const review = await api.createReview(p.id, { rating: selectedRating, text });
-        const list = document.getElementById('reviewsList');
-        if (list.querySelector('.state-msg')) list.innerHTML = '';
-        list.insertAdjacentHTML('afterbegin', reviewCard(review));
-        e.target.reset();
-        stars.forEach(st => st.classList.remove('active'));
-        selectedRating = 0;
-      } catch (err) {
-        alert(err.message || 'Не удалось отправить отзыв');
-      } finally {
-        submitBtn.disabled = false; submitBtn.textContent = 'Оставить отзыв';
-      }
-    });
-  }
-
-  function reviewCard(r) {
-    const stars = '★'.repeat(r.rating || 0) + '☆'.repeat(5 - (r.rating || 0));
-    return `
+      function reviewCard(r) {
+        const stars =
+          "★".repeat(r.rating || 0) + "☆".repeat(5 - (r.rating || 0));
+        return `
       <div class="review-card">
         <div class="review-head">
-          <span class="review-author">${r.author_name || r.user_name || 'Покупатель'}</span>
+          <span class="review-author">${r.userh || r.user_name || "Покупатель"}</span>
           <span class="stars">${stars}</span>
         </div>
         <div class="review-text">${r.text}</div>
       </div>
     `;
-  }
-
-  async function initWishlistState(productId) {
-    const btn = document.getElementById('wishBtn');
-    if (!api.isLoggedIn()) return;
-    try {
-      const list = await api.getWishlist();
-      const items = Array.isArray(list) ? list : (list.results || []);
-      const existing = items.find(i => i.product === productId || (i.product && i.product.id === productId));
-      if (existing) {
-        wishlistEntryId = existing.id;
-        btn.classList.add('active');
-        btn.textContent = '♥';
       }
-    } catch (_) { /* тихо игнорируем — не критично для показа товара */ }
 
-    btn.addEventListener('click', async () => {
-      if (!api.isLoggedIn()) { window.location.href = 'login.html'; return; }
-      btn.classList.add('pulse');
-      setTimeout(() => btn.classList.remove('pulse'), 500);
-      try {
-        if (wishlistEntryId) {
-          await api.removeWishlist(wishlistEntryId);
-          wishlistEntryId = null;
-          btn.classList.remove('active');
-          btn.textContent = '♡';
-        } else {
-          const entry = await api.addWishlist(productId);
-          wishlistEntryId = entry.id;
-          btn.classList.add('active');
-          btn.textContent = '♥';
+      async function initWishlistState(productId) {
+        const btn = document.getElementById("wishBtn");
+        if (!api.isLoggedIn()) return;
+        try {
+          const list = await api.getWishlist();
+          const items = Array.isArray(list) ? list : list.results || [];
+          const existing = items.find(
+            (i) =>
+              i.product === productId ||
+              (i.product && i.product.id === productId),
+          );
+          if (existing) {
+            wishlistEntryId = existing.id;
+            btn.classList.add("active");
+            btn.textContent = "♥";
+          }
+        } catch (_) {
+          /* тихо игнорируем — не критично для показа товара */
         }
-      } catch (err) {
-        alert(err.message || 'Не удалось обновить избранное');
+
+        btn.addEventListener("click", async () => {
+          if (!api.isLoggedIn()) {
+            window.location.href = "login.html";
+            return;
+          }
+          btn.classList.add("pulse");
+          setTimeout(() => btn.classList.remove("pulse"), 500);
+          try {
+            if (wishlistEntryId) {
+              await api.removeWishlist(wishlistEntryId);
+              wishlistEntryId = null;
+              btn.classList.remove("active");
+              btn.textContent = "♡";
+            } else {
+              const entry = await api.addWishlist(productId);
+              wishlistEntryId = entry.id;
+              btn.classList.add("active");
+              btn.textContent = "♥";
+            }
+          } catch (err) {
+            alert(err.message || "Не удалось обновить избранное");
+          }
+        });
       }
-    });
-  }
 
-  load();
-</script>
-
-</body>
+      load();
+    </script>
+  </body>
 </html>

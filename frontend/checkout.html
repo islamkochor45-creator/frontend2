@@ -1,164 +1,438 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ярмарка — оформление заказа</title>
-<link rel="stylesheet" href="css/style.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ярмарка — оформление заказа</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
 
-<header class="site-header">
-  <div class="logo">Я<span>Р</span>МАРКА</div>
-  <nav class="main-nav">
-    <a href="index.html">Каталог</a>
-    <a href="cart.html">Корзина</a>
-    <a href="wishlist.html">Избранное</a>
-    <a href="orders.html">Заказы</a>
-  </nav>
-  <div class="header-actions"><div id="userSlot"></div></div>
-</header>
+  <body>
+    <header class="site-header">
+      <div class="logo">Я<span>Р</span>МАРКА</div>
 
-<main class="wrap checkout-page">
-  <h1>Оформление заказа</h1>
-  <div id="checkoutContent"><div class="state-msg">Загружаем данные…</div></div>
-</main>
+      <nav class="main-nav">
+        <a href="index.html">Каталог</a>
+        <a href="cart.html">Корзина</a>
+        <a href="wishlist.html">Избранное</a>
+        <a href="orders.html">Заказы</a>
+      </nav>
 
-<script type="module">
-  import { api } from './js/api.js';
-  import { initHeader } from './js/header.js';
-  import { initWidgets } from './js/widgets.js';
-
-  initHeader();
-  initWidgets();
-
-  const content = document.getElementById('checkoutContent');
-  const fmt = n => new Intl.NumberFormat('ru-RU').format(n) + ' ₽';
-  let selectedAddressId = null;
-  let selectedPayment = 'mock';
-
-  async function load() {
-    if (!api.isLoggedIn()) {
-      content.innerHTML = `<div class="state-msg">Войдите, чтобы оформить заказ. <a href="login.html" style="color:var(--gold)">Войти →</a></div>`;
-      return;
-    }
-    try {
-      const [cart, addresses] = await Promise.all([
-        api.getCart(),
-        api.getAddresses().catch(() => []),
-      ]);
-      const items = cart.items || [];
-      if (!items.length) {
-        content.innerHTML = `<div class="state-msg">Корзина пуста. <a href="index.html" style="color:var(--gold)">В каталог →</a></div>`;
-        return;
-      }
-      render(items, Array.isArray(addresses) ? addresses : (addresses.results || []));
-    } catch (err) {
-      content.innerHTML = `<div class="state-msg error">Не удалось загрузить данные: ${err.message || 'ошибка сервера'}</div>`;
-    }
-  }
-
-  function render(items, addresses) {
-    const total = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
-    if (addresses.length) selectedAddressId = addresses[0].id;
-
-    content.innerHTML = `
-      <div class="checkout-layout">
-        <div>
-          <div class="checkout-block">
-            <h2>Адрес доставки</h2>
-            <div id="addressList">
-              ${addresses.map((a, i) => addressOption(a, i === 0)).join('')}
-            </div>
-            <button type="button" class="btn-ghost" id="newAddressToggle" style="margin-top:8px; font-size:13px; padding:10px 18px;">+ Новый адрес</button>
-            <div class="new-address-form" id="newAddressForm">
-              <input type="text" id="fCity" placeholder="Город">
-              <input type="text" id="fStreet" placeholder="Улица">
-              <input type="text" id="fHouse" placeholder="Дом, квартира">
-              <input type="text" id="fPostal" placeholder="Индекс">
-              <button type="button" class="btn-primary" id="saveAddressBtn" style="align-self:flex-start;">Сохранить адрес</button>
-            </div>
-          </div>
-
-          <div class="checkout-block">
-            <h2>Способ оплаты</h2>
-            <div class="pay-option selected" data-pay="mock">
-              <input type="radio" name="pay" checked> Тестовая оплата (mock-провайдер)
-            </div>
-          </div>
-        </div>
-
-        <div class="cart-summary">
-          <h2>Итого</h2>
-          <div class="summary-row"><span>Товаров</span><span>${items.reduce((s, i) => s + i.quantity, 0)}</span></div>
-          <div class="summary-row total"><span>К оплате</span><span>${fmt(total)}</span></div>
-          <button class="btn-primary" style="width:100%; margin-top:18px;" id="payBtn" ${addresses.length ? '' : 'disabled'}>Оплатить и оформить</button>
-          ${addresses.length ? '' : '<p style="font-size:12px; color:var(--muted); margin-top:10px;">Добавьте адрес, чтобы продолжить</p>'}
-        </div>
+      <div class="header-actions">
+        <div id="userSlot"></div>
       </div>
-    `;
+    </header>
 
-    content.querySelectorAll('.address-option').forEach(el => {
-      el.addEventListener('click', () => {
-        content.querySelectorAll('.address-option').forEach(o => o.classList.remove('selected'));
-        el.classList.add('selected');
-        selectedAddressId = el.dataset.id;
-      });
-    });
+    <main class="wrap checkout-page">
+      <h1>Оформление заказа</h1>
 
-    document.getElementById('newAddressToggle').addEventListener('click', () => {
-      document.getElementById('newAddressForm').classList.toggle('open');
-    });
+      <div id="checkoutContent">
+        <div class="state-msg">Загружаем данные…</div>
+      </div>
+    </main>
 
-    document.getElementById('saveAddressBtn').addEventListener('click', async () => {
-      const payload = {
-        city: document.getElementById('fCity').value.trim(),
-        street: document.getElementById('fStreet').value.trim(),
-        house: document.getElementById('fHouse').value.trim(),
-        postal_code: document.getElementById('fPostal').value.trim(),
-      };
-      if (!payload.city || !payload.street) { alert('Заполните хотя бы город и улицу'); return; }
-      try {
-        const addr = await api.createAddress(payload);
-        selectedAddressId = addr.id;
-        load();
-      } catch (err) {
-        alert(err.message || 'Не удалось сохранить адрес');
+    <script type="module">
+      import { api } from "./js/api.js";
+      import { initHeader } from "./js/header.js";
+      import { initWidgets } from "./js/widgets.js";
+
+      initHeader();
+      initWidgets();
+
+      const content = document.getElementById("checkoutContent");
+
+      const fmt = (n) =>
+        new Intl.NumberFormat("ru-RU").format(Number(n) || 0) + " ₽";
+
+      let selectedAddressId = null;
+      let selectedPayment = "mock";
+      let orderTotal = 0;
+
+      async function load() {
+        if (!api.isLoggedIn()) {
+          content.innerHTML = `
+            <div class="state-msg">
+              Войдите, чтобы оформить заказ.
+              <a href="login.html" style="color:var(--gold)">
+                Войти →
+              </a>
+            </div>
+          `;
+          return;
+        }
+
+        try {
+          const [cart, addresses] = await Promise.all([
+            api.getCart(),
+            api.getAddresses().catch(() => []),
+          ]);
+
+          const items = cart.items || [];
+
+          if (!items.length) {
+            content.innerHTML = `
+              <div class="state-msg">
+                Корзина пуста.
+                <a href="index.html" style="color:var(--gold)">
+                  В каталог →
+                </a>
+              </div>
+            `;
+            return;
+          }
+
+          const addressList = Array.isArray(addresses)
+            ? addresses
+            : addresses.results || [];
+
+          render(items, addressList);
+        } catch (err) {
+          console.error(err);
+
+          content.innerHTML = `
+            <div class="state-msg error">
+              Не удалось загрузить данные:
+              ${err.message || "ошибка сервера"}
+            </div>
+          `;
+        }
       }
-    });
 
-    document.getElementById('payBtn').addEventListener('click', handlePay);
-  }
+      function render(items, addresses) {
+        // Считаем итоговую сумму
+        orderTotal = items.reduce(
+          (sum, item) =>
+            sum + Number(item.product_price || 0) * Number(item.quantity || 0),
+          0,
+        );
 
-  function addressOption(a, selected) {
-    return `
-      <label class="address-option ${selected ? 'selected' : ''}" data-id="${a.id}">
-        <input type="radio" name="address" ${selected ? 'checked' : ''}>
-        <div>
-          <div style="font-weight:700; font-size:13px;">${a.city}, ${a.street} ${a.house || ''}</div>
-          <div style="font-size:12px; color:var(--muted);">${a.postal_code || ''}</div>
-        </div>
-      </label>
-    `;
-  }
+        // Выбираем первый адрес по умолчанию
+        if (addresses.length) {
+          selectedAddressId = Number(addresses[0].id);
+        } else {
+          selectedAddressId = null;
+        }
 
-  async function handlePay() {
-    const btn = document.getElementById('payBtn');
-    btn.disabled = true;
-    btn.textContent = 'Оформляем…';
-    try {
-      const order = await api.createOrder({ address: selectedAddressId });
-      await api.createPayment(order.id);
-      window.location.href = `order-success.html?id=${order.id}`;
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = 'Оплатить и оформить';
-      alert(err.message || 'Не удалось оформить заказ');
-    }
-  }
+        content.innerHTML = `
+          <div class="checkout-layout">
 
-  load();
-</script>
+            <div>
 
-</body>
+              <!-- Адрес -->
+              <div class="checkout-block">
+                <h2>Адрес доставки</h2>
+
+                <div id="addressList">
+                  ${
+                    addresses.length
+                      ? addresses
+                          .map((address, index) =>
+                            addressOption(address, index === 0),
+                          )
+                          .join("")
+                      : `
+                        <div class="state-msg">
+                          У вас пока нет сохранённых адресов.
+                        </div>
+                      `
+                  }
+                </div>
+
+                <button
+                  type="button"
+                  class="btn-ghost"
+                  id="newAddressToggle"
+                  style="
+                    margin-top:8px;
+                    font-size:13px;
+                    padding:10px 18px;
+                  "
+                >
+                  + Новый адрес
+                </button>
+
+                <div
+                  class="new-address-form"
+                  id="newAddressForm"
+                >
+                  <input
+                    type="text"
+                    id="fCity"
+                    placeholder="Город"
+                  />
+
+                  <input
+                    type="text"
+                    id="fStreet"
+                    placeholder="Улица"
+                  />
+
+                  <input
+                    type="text"
+                    id="fHouse"
+                    placeholder="Дом, квартира"
+                  />
+
+                  <input
+                    type="text"
+                    id="fPostal"
+                    placeholder="Индекс"
+                  />
+
+                  <button
+                    type="button"
+                    class="btn-primary"
+                    id="saveAddressBtn"
+                    style="align-self:flex-start;"
+                  >
+                    Сохранить адрес
+                  </button>
+                </div>
+              </div>
+
+              <!-- Оплата -->
+              <div class="checkout-block">
+                <h2>Способ оплаты</h2>
+
+                <div
+                  class="pay-option selected"
+                  data-pay="mock"
+                >
+                  <input
+                    type="radio"
+                    name="pay"
+                    value="mock"
+                    checked
+                  />
+
+                  Тестовая оплата (mock-провайдер)
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Итого -->
+            <div class="cart-summary">
+              <h2>Итого</h2>
+
+              <div class="summary-row">
+                <span>Товаров</span>
+                <span>
+                  ${items.reduce(
+                    (sum, item) => sum + Number(item.quantity || 0),
+                    0,
+                  )}
+                </span>
+              </div>
+
+              <div class="summary-row total">
+                <span>К оплате</span>
+                <span>${fmt(orderTotal)}</span>
+              </div>
+
+              <button
+                class="btn-primary"
+                style="width:100%; margin-top:18px;"
+                id="payBtn"
+                ${addresses.length ? "" : "disabled"}
+              >
+                Оплатить и оформить
+              </button>
+
+              ${
+                addresses.length
+                  ? ""
+                  : `
+                    <p
+                      style="
+                        font-size:12px;
+                        color:var(--muted);
+                        margin-top:10px;
+                      "
+                    >
+                      Добавьте адрес, чтобы продолжить
+                    </p>
+                  `
+              }
+            </div>
+
+          </div>
+        `;
+
+        // Выбор адреса
+        content.querySelectorAll(".address-option").forEach((el) => {
+          el.addEventListener("click", () => {
+            content.querySelectorAll(".address-option").forEach((option) => {
+              option.classList.remove("selected");
+
+              const radio = option.querySelector('input[type="radio"]');
+
+              if (radio) {
+                radio.checked = false;
+              }
+            });
+
+            el.classList.add("selected");
+
+            const radio = el.querySelector('input[type="radio"]');
+
+            if (radio) {
+              radio.checked = true;
+            }
+
+            // dataset всегда string, поэтому превращаем в число
+            selectedAddressId = Number(el.dataset.id);
+
+            console.log(
+              "Выбранный адрес:",
+              selectedAddressId,
+              typeof selectedAddressId,
+            );
+          });
+        });
+
+        // Открытие формы нового адреса
+        const newAddressToggle = document.getElementById("newAddressToggle");
+
+        if (newAddressToggle) {
+          newAddressToggle.addEventListener("click", () => {
+            document.getElementById("newAddressForm").classList.toggle("open");
+          });
+        }
+
+        // Сохранение нового адреса
+        const saveAddressBtn = document.getElementById("saveAddressBtn");
+
+        if (saveAddressBtn) {
+          saveAddressBtn.addEventListener("click", async () => {
+            const payload = {
+              city: document.getElementById("fCity").value.trim(),
+
+              street: document.getElementById("fStreet").value.trim(),
+
+              house: document.getElementById("fHouse").value.trim(),
+
+              postal_code: document.getElementById("fPostal").value.trim(),
+            };
+
+            if (!payload.city || !payload.street) {
+              alert("Заполните хотя бы город и улицу");
+              return;
+            }
+
+            saveAddressBtn.disabled = true;
+            saveAddressBtn.textContent = "Сохраняем…";
+
+            try {
+              const addr = await api.createAddress(payload);
+
+              selectedAddressId = Number(addr.id);
+
+              await load();
+            } catch (err) {
+              console.error(err);
+
+              alert(err.message || "Не удалось сохранить адрес");
+
+              saveAddressBtn.disabled = false;
+              saveAddressBtn.textContent = "Сохранить адрес";
+            }
+          });
+        }
+
+        // Кнопка оплаты
+        const payBtn = document.getElementById("payBtn");
+
+        if (payBtn) {
+          payBtn.addEventListener("click", handlePay);
+        }
+      }
+
+      function addressOption(address, selected) {
+        return `
+          <label
+            class="address-option ${selected ? "selected" : ""}"
+            data-id="${address.id}"
+          >
+            <input
+              type="radio"
+              name="address"
+              ${selected ? "checked" : ""}
+            />
+
+            <div>
+              <div
+                style="
+                  font-weight:700;
+                  font-size:13px;
+                "
+              >
+                ${address.city},
+                ${address.street}
+                ${address.house || ""}
+              </div>
+
+              <div
+                style="
+                  font-size:12px;
+                  color:var(--muted);
+                "
+              >
+                ${address.postal_code || ""}
+              </div>
+            </div>
+          </label>
+        `;
+      }
+
+      async function handlePay() {
+        const btn = document.getElementById("payBtn");
+
+        if (!selectedAddressId) {
+          alert("Выберите адрес доставки.");
+          return;
+        }
+
+        if (!orderTotal || orderTotal <= 0) {
+          alert("Некорректная сумма заказа.");
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "Оформляем…";
+
+        try {
+          console.log("Создаём заказ:", {
+            address: selectedAddressId,
+          });
+
+          // Создаём заказ
+          const order = await api.createOrder({
+            address: selectedAddressId,
+          });
+
+          console.log("Заказ создан:", order);
+
+          // Создаём платёж
+          const payment = await api.createPayment({
+            order: order.id,
+            amount: orderTotal,
+          });
+
+          console.log("Платёж создан:", payment);
+
+          window.location.href = `order-success.html?id=${order.id}`;
+        } catch (err) {
+          console.error("Ошибка оформления заказа:", err);
+
+          btn.disabled = false;
+          btn.textContent = "Оплатить и оформить";
+
+          alert(err.message || "Не удалось оформить заказ");
+        }
+      }
+
+      load();
+    </script>
+  </body>
 </html>

@@ -1,72 +1,161 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ярмарка — избранное</title>
-<link rel="stylesheet" href="css/style.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ярмарка — избранное</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="logo">Я<span>Р</span>МАРКА</div>
+      <nav class="main-nav">
+        <a href="index.html">Каталог</a>
+        <a href="cart.html">Корзина</a>
+        <a href="wishlist.html" class="active">Избранное</a>
+        <a href="orders.html">Заказы</a>
+      </nav>
+      <div class="header-actions">
+        <div id="userSlot"></div>
+        <a href="cart.html" class="cart-btn"
+          >Корзина<span class="cart-badge" id="cartBadge">0</span></a
+        >
+      </div>
+    </header>
 
-<header class="site-header">
-  <div class="logo">Я<span>Р</span>МАРКА</div>
-  <nav class="main-nav">
-    <a href="index.html">Каталог</a>
-    <a href="cart.html">Корзина</a>
-    <a href="wishlist.html" class="active">Избранное</a>
-    <a href="orders.html">Заказы</a>
-  </nav>
-  <div class="header-actions">
-    <div id="userSlot"></div>
-    <a href="cart.html" class="cart-btn">Корзина<span class="cart-badge" id="cartBadge">0</span></a>
-  </div>
-</header>
+    <main class="wrap wishlist-page">
+      <h1>Избранное</h1>
+      <div id="grid" class="grid">
+        <div class="state-msg">Загружаем избранное…</div>
+      </div>
+    </main>
 
-<main class="wrap wishlist-page">
-  <h1>Избранное</h1>
-  <div id="grid" class="grid"><div class="state-msg">Загружаем избранное…</div></div>
-</main>
+    <script type="module">
+      import { api } from "./js/api.js";
+      import { initHeader } from "./js/header.js";
+      import { initWidgets } from "./js/widgets.js";
 
-<script type="module">
-  import { api } from './js/api.js';
-  import { initHeader } from './js/header.js';
-  import { initWidgets } from './js/widgets.js';
+      initHeader();
+      initWidgets();
 
-  initHeader();
-  initWidgets();
+      const grid = document.getElementById("grid");
+      const fmt = (n) => new Intl.NumberFormat("ru-RU").format(n) + " ₽";
 
-  const grid = document.getElementById('grid');
-  const fmt = n => new Intl.NumberFormat('ru-RU').format(n) + ' ₽';
+      const FALLBACK_IMAGE = "https://picsum.photos/seed/placeholder/600/750";
+      const BACKEND_ROOT = "http://localhost:8000";
 
-  async function load() {
-    if (!api.isLoggedIn()) {
-      grid.innerHTML = `<div class="state-msg">Войдите, чтобы видеть избранное. <a href="login.html" style="color:var(--gold)">Войти →</a></div>`;
-      return;
-    }
-    try {
-      const data = await api.getWishlist();
-      const items = Array.isArray(data) ? data : (data.results || []);
-      render(items);
-    } catch (err) {
-      grid.innerHTML = `<div class="state-msg error">Не удалось загрузить избранное: ${err.message || 'ошибка сервера'}</div>`;
-    }
-  }
+      function normalizeImageUrl(src) {
+        if (!src || typeof src !== "string") return FALLBACK_IMAGE;
+        const value = src.trim();
+        if (!value) return FALLBACK_IMAGE;
+        if (value.startsWith("http://") || value.startsWith("https://"))
+          return value;
+        if (value.startsWith("/")) return `${BACKEND_ROOT}${value}`;
+        if (value.startsWith("media/")) return `${BACKEND_ROOT}/${value}`;
+        return value;
+      }
 
-  function render(items) {
-    if (!items.length) {
-      grid.innerHTML = `<div class="state-msg">Пока пусто. <a href="index.html" style="color:var(--gold)">В каталог →</a></div>`;
-      return;
-    }
-    grid.innerHTML = '';
-    items.forEach(entry => {
-      const p = entry.product && entry.product.id ? entry.product : entry;
-      const image = p.image || `https://picsum.photos/seed/w${p.id}/600/750`;
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.dataset.entryId = entry.id;
-      card.innerHTML = `
+      function getProductImage(product) {
+        if (!product) return FALLBACK_IMAGE;
+
+        const candidates = [];
+        const push = (value) => {
+          if (typeof value === "string" && value.trim())
+            candidates.push(value.trim());
+        };
+
+        push(product.image);
+        push(product.image_url);
+        push(product.photo);
+        push(product.thumbnail);
+        push(product.picture);
+        push(product.main_image);
+        push(product.product_image);
+        push(product.cover);
+
+        if (Array.isArray(product.images)) {
+          product.images.forEach((img) => {
+            if (typeof img === "string") push(img);
+            else if (img) {
+              push(img.image);
+              push(img.url);
+              push(img.src);
+            }
+          });
+        }
+
+        if (product.product) {
+          const nested = getProductImage(product.product);
+          if (nested && nested !== FALLBACK_IMAGE) return nested;
+        }
+
+        return candidates.length
+          ? normalizeImageUrl(candidates[0])
+          : FALLBACK_IMAGE;
+      }
+
+      async function enrichWishlistItem(entry) {
+        const product =
+          entry.product && entry.product.id ? entry.product : entry;
+        const id = product && product.id;
+        if (!id) return entry;
+
+        const hasImage =
+          (typeof product.image === "string" && product.image.trim()) ||
+          (Array.isArray(product.images) &&
+            product.images.some((img) => {
+              if (typeof img === "string") return !!img.trim();
+              return !!(img && img.image && img.image.trim());
+            }));
+
+        if (hasImage) return entry;
+
+        try {
+          const fullProduct = await api.getProduct(id);
+          return {
+            ...entry,
+            product: {
+              ...(product || {}),
+              ...(fullProduct || {}),
+            },
+          };
+        } catch (_) {
+          return entry;
+        }
+      }
+
+      async function load() {
+        if (!api.isLoggedIn()) {
+          grid.innerHTML = `<div class="state-msg">Войдите, чтобы видеть избранное. <a href="login.html" style="color:var(--gold)">Войти →</a></div>`;
+          return;
+        }
+        try {
+          const data = await api.getWishlist();
+          const items = Array.isArray(data) ? data : data.results || [];
+          const enrichedItems = await Promise.all(
+            items.map(enrichWishlistItem),
+          );
+          render(enrichedItems);
+        } catch (err) {
+          grid.innerHTML = `<div class="state-msg error">Не удалось загрузить избранное: ${err.message || "ошибка сервера"}</div>`;
+        }
+      }
+
+      function render(items) {
+        if (!items.length) {
+          grid.innerHTML = `<div class="state-msg">Пока пусто. <a href="index.html" style="color:var(--gold)">В каталог →</a></div>`;
+          return;
+        }
+        grid.innerHTML = "";
+        items.forEach((entry) => {
+          const p = entry.product && entry.product.id ? entry.product : entry;
+          const image = getProductImage(p);
+          const card = document.createElement("div");
+          card.className = "card";
+          card.dataset.entryId = entry.id;
+          card.innerHTML = `
         <div class="card-media">
-          <a href="product.html?id=${p.id}"><img src="${image}" alt="${p.name || p.title}" loading="lazy"></a>
+          <a href="product.html?id=${p.id}"><img src="${image}" alt="${p.name || p.title}" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';"></a>
           <button class="wish-btn active" data-entry-id="${entry.id}">♥</button>
         </div>
         <div class="card-body">
@@ -74,28 +163,29 @@
           <div class="card-footer"><div class="card-price">${fmt(p.price)}</div></div>
         </div>
       `;
-      grid.appendChild(card);
-    });
-  }
+          grid.appendChild(card);
+        });
+      }
 
-  grid.addEventListener('click', async (e) => {
-    if (!e.target.classList.contains('wish-btn')) return;
-    const card = e.target.closest('.card');
-    const entryId = e.target.dataset.entryId;
-    card.style.transition = 'opacity .35s ease, transform .35s ease';
-    card.style.opacity = '0';
-    card.style.transform = 'scale(0.92)';
-    try {
-      await api.removeWishlist(entryId);
-    } catch (_) { /* удаляем визуально в любом случае, при ошибке просто перезагрузим */ }
-    setTimeout(() => {
-      card.remove();
-      if (!grid.children.length) load();
-    }, 350);
-  });
+      grid.addEventListener("click", async (e) => {
+        if (!e.target.classList.contains("wish-btn")) return;
+        const card = e.target.closest(".card");
+        const entryId = e.target.dataset.entryId;
+        card.style.transition = "opacity .35s ease, transform .35s ease";
+        card.style.opacity = "0";
+        card.style.transform = "scale(0.92)";
+        try {
+          await api.removeWishlist(entryId);
+        } catch (_) {
+          /* удаляем визуально в любом случае, при ошибке просто перезагрузим */
+        }
+        setTimeout(() => {
+          card.remove();
+          if (!grid.children.length) load();
+        }, 350);
+      });
 
-  load();
-</script>
-
-</body>
+      load();
+    </script>
+  </body>
 </html>

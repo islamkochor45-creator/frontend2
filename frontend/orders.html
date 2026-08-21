@@ -1,136 +1,146 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ярмарка — мои заказы</title>
-<link rel="stylesheet" href="css/style.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ярмарка — мои заказы</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="logo">Я<span>Р</span>МАРКА</div>
+      <nav class="main-nav">
+        <a href="index.html">Каталог</a>
+        <a href="cart.html">Корзина</a>
+        <a href="wishlist.html">Избранное</a>
+        <a href="orders.html" class="active">Заказы</a>
+      </nav>
+      <div class="header-actions">
+        <div id="userSlot"></div>
+        <a href="cart.html" class="cart-btn"
+          >Корзина<span class="cart-badge" id="cartBadge">0</span></a
+        >
+      </div>
+    </header>
 
-<header class="site-header">
-  <div class="logo">Я<span>Р</span>МАРКА</div>
-  <nav class="main-nav">
-    <a href="index.html">Каталог</a>
-    <a href="cart.html">Корзина</a>
-    <a href="wishlist.html">Избранное</a>
-    <a href="orders.html" class="active">Заказы</a>
-  </nav>
-  <div class="header-actions">
-    <div id="userSlot"></div>
-    <a href="cart.html" class="cart-btn">Корзина<span class="cart-badge" id="cartBadge">0</span></a>
-  </div>
-</header>
+    <main class="wrap orders-page">
+      <h1>Мои заказы</h1>
+      <div id="ordersList"><div class="state-msg">Загружаем заказы…</div></div>
+    </main>
 
-<main class="wrap orders-page">
-  <h1>Мои заказы</h1>
-  <div id="ordersList"><div class="state-msg">Загружаем заказы…</div></div>
-</main>
+    <script type="module">
+      import { api } from "./js/api.js";
+      import { initHeader } from "./js/header.js";
+      import { initWidgets } from "./js/widgets.js";
+      import { connectWS } from "./js/ws.js";
 
-<script type="module">
-  import { api } from './js/api.js';
-  import { initHeader } from './js/header.js';
-  import { initWidgets } from './js/widgets.js';
-  import { connectWS } from './js/ws.js';
+      initHeader();
+      initWidgets();
 
-  initHeader();
-  initWidgets();
+      const list = document.getElementById("ordersList");
+      const fmt = (n) => new Intl.NumberFormat("ru-RU").format(n) + " ₽";
 
-  const list = document.getElementById('ordersList');
-  const fmt = n => new Intl.NumberFormat('ru-RU').format(n) + ' ₽';
+      const statusLabels = {
+        pending: "Ожидает оплаты",
+        paid: "Оплачен",
+        processing: "Собирается",
+        shipped: "В пути",
+        delivered: "Доставлен",
+        cancelled: "Отменён",
+      };
 
-  const statusLabels = {
-    pending: 'Ожидает оплаты',
-    paid: 'Оплачен',
-    processing: 'Собирается',
-    shipped: 'В пути',
-    delivered: 'Доставлен',
-    cancelled: 'Отменён',
-  };
+      async function load() {
+        if (!api.isLoggedIn()) {
+          list.innerHTML = `<div class="state-msg">Войдите, чтобы увидеть заказы. <a href="login.html" style="color:var(--gold)">Войти →</a></div>`;
+          return;
+        }
+        try {
+          const data = await api.getOrders();
+          const items = Array.isArray(data) ? data : data.results || [];
+          render(items);
+          listenForUpdates();
+        } catch (err) {
+          list.innerHTML = `<div class="state-msg error">Не удалось загрузить заказы: ${err.message || "ошибка сервера"}</div>`;
+        }
+      }
 
-  async function load() {
-    if (!api.isLoggedIn()) {
-      list.innerHTML = `<div class="state-msg">Войдите, чтобы увидеть заказы. <a href="login.html" style="color:var(--gold)">Войти →</a></div>`;
-      return;
-    }
-    try {
-      const data = await api.getOrders();
-      const items = Array.isArray(data) ? data : (data.results || []);
-      render(items);
-      listenForUpdates();
-    } catch (err) {
-      list.innerHTML = `<div class="state-msg error">Не удалось загрузить заказы: ${err.message || 'ошибка сервера'}</div>`;
-    }
-  }
+      function render(orders) {
+        if (!orders.length) {
+          list.innerHTML = `<div class="state-msg">Заказов пока нет. <a href="index.html" style="color:var(--gold)">В каталог →</a></div>`;
+          return;
+        }
+        list.innerHTML = orders.map(orderCard).join("");
 
-  function render(orders) {
-    if (!orders.length) {
-      list.innerHTML = `<div class="state-msg">Заказов пока нет. <a href="index.html" style="color:var(--gold)">В каталог →</a></div>`;
-      return;
-    }
-    list.innerHTML = orders.map(orderCard).join('');
+        list.querySelectorAll("[data-cancel]").forEach((btn) => {
+          btn.addEventListener("click", () =>
+            handleCancel(btn.dataset.cancel, btn),
+          );
+        });
+      }
 
-    list.querySelectorAll('[data-cancel]').forEach(btn => {
-      btn.addEventListener('click', () => handleCancel(btn.dataset.cancel, btn));
-    });
-  }
-
-  function orderCard(o) {
-    const itemsSummary = (o.items || []).map(i => `${(i.product && (i.product.name || i.product.title)) || 'Товар'} × ${i.quantity}`).join(', ');
-    const canCancel = ['pending', 'paid'].includes(o.status);
-    return `
+      function orderCard(o) {
+        const itemsSummary = (o.items || [])
+          .map(
+            (i) =>
+              `${(i.product && (i.product.name || i.product.title)) || "Товар"} × ${i.quantity}`,
+          )
+          .join(", ");
+        const canCancel = ["pending", "paid"].includes(o.status);
+        return `
       <div class="order-card" data-order-id="${o.id}">
         <div class="order-card-head">
           <span class="order-id">Заказ #${o.id}</span>
           <span class="order-status ${o.status}" data-status-badge>${statusLabels[o.status] || o.status}</span>
         </div>
-        <div class="order-items">${itemsSummary || '—'}</div>
+        <div class="order-items">${itemsSummary || "—"}</div>
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div class="order-total">${fmt(o.total || 0)}</div>
-          ${canCancel ? `<button class="btn-danger" data-cancel="${o.id}">Отменить заказ</button>` : ''}
+          <div class="order-total">${fmt(o.items.reduce((sum, i) => sum + (i.price_at_purchase || 0) * i.quantity, 0))}</div>
+          ${canCancel ? `<button class="btn-danger" data-cancel="${o.id}">Отменить заказ</button>` : ""}
         </div>
       </div>
     `;
-  }
+      }
 
-  async function handleCancel(orderId, btn) {
-    btn.disabled = true;
-    btn.textContent = 'Отменяем…';
-    try {
-      await api.cancelOrder(orderId);
-      updateOrderStatus(orderId, 'cancelled');
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = 'Отменить заказ';
-      alert(err.message || 'Не удалось отменить заказ');
-    }
-  }
-
-  function updateOrderStatus(orderId, status) {
-    const card = list.querySelector(`[data-order-id="${orderId}"]`);
-    if (!card) return;
-    const badge = card.querySelector('[data-status-badge]');
-    badge.className = `order-status ${status}`;
-    badge.textContent = statusLabels[status] || status;
-    badge.style.animation = 'none';
-    requestAnimationFrame(() => { badge.style.animation = 'fadeUp .4s ease'; });
-    const cancelBtn = card.querySelector('[data-cancel]');
-    if (cancelBtn && !['pending', 'paid'].includes(status)) cancelBtn.remove();
-  }
-
-  function listenForUpdates() {
-    connectWS(
-      () => api.wsUrl('/notifications/'),
-      (msg) => {
-        if (msg.order_id && msg.status) {
-          updateOrderStatus(msg.order_id, msg.status);
+      async function handleCancel(orderId, btn) {
+        btn.disabled = true;
+        btn.textContent = "Отменяем…";
+        try {
+          await api.cancelOrder(orderId);
+          updateOrderStatus(orderId, "cancelled");
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = "Отменить заказ";
+          alert(err.message || "Не удалось отменить заказ");
         }
-      },
-    );
-  }
+      }
 
-  load();
-</script>
+      function updateOrderStatus(orderId, status) {
+        const card = list.querySelector(`[data-order-id="${orderId}"]`);
+        if (!card) return;
+        const badge = card.querySelector("[data-status-badge]");
+        badge.className = `order-status ${status}`;
+        badge.textContent = statusLabels[status] || status;
+        badge.style.animation = "none";
+        requestAnimationFrame(() => {
+          badge.style.animation = "fadeUp .4s ease";
+        });
+        const cancelBtn = card.querySelector("[data-cancel]");
+        if (cancelBtn && !["pending", "paid"].includes(status))
+          cancelBtn.remove();
+      }
 
-</body>
+      function listenForUpdates() {
+        connectWS(
+          () => api.wsUrl("/notifications/"),
+          (msg) => {
+            if (msg.order_id && msg.status) {
+              updateOrderStatus(msg.order_id, msg.status);
+            }
+          },
+        );
+      }
+
+      load();
+    </script>
+  </body>
 </html>

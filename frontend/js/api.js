@@ -192,7 +192,7 @@ export const api = {
 
   // --- Заказы ---
   createOrder(payload) {
-    return request("/orders/", {
+    return request("/orders/checkout/", {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -204,48 +204,49 @@ export const api = {
     return request(`/orders/${id}/`);
   },
   cancelOrder(id) {
-    return request(`/orders/${id}/cancel/`, { method: "POST" });
+    return request(`/orders/${id}/`, { method: "DELETE" });
   },
 
   // --- Адреса доставки ---
-  getAddresses() {
-    return request("/addresses/");
-  },
   createAddress(payload) {
-    return request("/addresses/", {
+    return request("/orders/addresses/", {
+      method: "POST",
+      // heders: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  },
+  getAddresses() {
+    return request("/orders/addresses/");
+  },
+
+  // --- Оплата (mock) ---
+  createPayment(payload) {
+    return request("/payments/create/", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
 
-  // --- Оплата (mock) ---
-  createPayment(orderId) {
-    return request("/payments/create/", {
-      method: "POST",
-      body: JSON.stringify({ order: orderId }),
-    });
-  },
-
   // --- Избранное ---
   getWishlist() {
-    return request("/wishlist/");
+    return request("/catalog/favorites/");
   },
   addWishlist(productId) {
-    return request("/wishlist/", {
+    return request("/catalog/favorites/add/", {
       method: "POST",
       body: JSON.stringify({ product: productId }),
     });
   },
   removeWishlist(entryId) {
-    return request(`/wishlist/${entryId}/`, { method: "DELETE" });
+    return request(`/catalog/favorites/${entryId}/`, { method: "DELETE" });
   },
 
   // --- Отзывы ---
   getReviews(productId) {
-    return request(`/products/${productId}/reviews/`);
+    return request(`/reviews/`);
   },
   createReview(productId, payload) {
-    return request(`/products/${productId}/reviews/`, {
+    return request(`/reviews/`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -253,25 +254,25 @@ export const api = {
 
   // --- Кабинет продавца ---
   getMyProducts() {
-    return request("/seller/products/");
+    return request("/catalog/products/");
   },
   createProduct(payload) {
-    return request("/seller/products/", {
+    return request("/catalog/products/", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
   updateProduct(id, payload) {
-    return request(`/seller/products/${id}/`, {
+    return request(`/catalog/products/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
   },
   getSellerOrders() {
-    return request("/seller/orders/");
+    return request("/catalog/sellers/");
   },
   getSellerStats() {
-    return request("/seller/stats/");
+    return request("/catalog/sellers/");
   },
 
   // --- Уведомления ---
@@ -280,8 +281,17 @@ export const api = {
   },
 
   // --- Чат ---
-  getChatHistory() {
+  getChatRooms() {
     return request("/chat/rooms/");
+  },
+  getRoomMessages(roomId) {
+    return request(`/chat/rooms/${roomId}/messages/`);
+  },
+  sendRoomMessage(roomId, text) {
+    return request(`/chat/rooms/${roomId}/messages/`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    });
   },
 
   wsUrl(path) {

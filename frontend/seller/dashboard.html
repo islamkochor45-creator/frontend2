@@ -19,6 +19,14 @@
     <main class="wrap seller-page">
       <h1>Кабинет продавца</h1>
 
+      <div class="checkout-block seller-profile-block">
+        <h2>Профиль магазина</h2>
+        <div class="new-address-form open">
+          <input type="text" id="companyName" placeholder="Название магазина" />
+          <button type="button" class="btn-ghost" id="saveProfileBtn">Сохранить профиль</button>
+        </div>
+      </div>
+
       <div class="stat-row" id="statRow">
         <div class="stat-card">
           <div class="num">—</div>
@@ -54,7 +62,8 @@
             <input type="text" id="pName" placeholder="Название товара" />
             <input type="text" id="pPrice" placeholder="Цена, ₽" />
             <input type="text" id="pStock" placeholder="Остаток на складе" />
-            <input type="text" id="pCategory" placeholder="Категория" />
+            <input type="number" id="pCategory" placeholder="ID категории" />
+            <input type="file" id="pImage" accept="image/*" />
             <textarea
               id="pDesc"
               placeholder="Описание"
@@ -120,6 +129,18 @@
 
       const fmt = (n) => new Intl.NumberFormat("ru-RU").format(n) + " ₽";
 
+      async function initSeller() {
+        try {
+          const me = await api.me();
+          if (me.role !== "seller") throw new Error("Доступ только для продавцов");
+          const profile = await api.getSellerProfile();
+          document.getElementById("companyName").value = profile.company_name || "";
+          await Promise.all([loadStats(), loadProducts()]);
+        } catch (err) {
+          document.querySelector(".seller-page").innerHTML = `<div class="state-msg error">${err.message || "Необходимо войти как продавец"}</div>`;
+        }
+      }
+
       async function loadStats() {
         try {
           const stats = await api.getSellerStats();
@@ -152,7 +173,11 @@
           <td>${p.name || p.title}</td>
           <td>${fmt(p.price)}</td>
           <td>${p.stock ?? "—"}</td>
-          <td><a href="../product.html?id=${p.id}" style="color:var(--gold); font-size:13px;">Открыть →</a></td>
+          <td>
+            <a href="../product.html?id=${p.id}" style="color:var(--gold); font-size:13px;">Открыть</a>
+            <button class="btn-ghost" data-edit="${p.id}">Изменить</button>
+            <button class="btn-danger" data-delete="${p.id}">Удалить</button>
+          </td>
         </tr>
       `,
             )
@@ -184,7 +209,11 @@
           
           <td>${(i.product && (i.product.name || i.product.title)) || "—"}</td>
           <td>${i.quantity || "—"}</td>
-          <td>${i.status || "—"}</td>
+          <td>
+            <select data-status-order="${i.order || i.id}">
+              ${["pending", "paid", "processing", "shipped", "delivered", "cancelled"].map((status) => `<option value="${status}" ${status === i.status ? "selected" : ""}>${status}</option>`).join("")}
+            </select>
+          </td>
         </tr>
       `,
             )
@@ -212,6 +241,47 @@
         });
       });
 
+      document.getElementById("saveProfileBtn").addEventListener("click", async () => {
+        try {
+          await api.updateSellerProfile({ company_name: document.getElementById("companyName").value.trim() });
+        } catch (err) {
+          alert(err.message || "Не удалось сохранить профиль");
+        }
+      });
+
+      document.getElementById("productsBody").addEventListener("click", async (event) => {
+        const deleteButton = event.target.closest("[data-delete]");
+        const editButton = event.target.closest("[data-edit]");
+        if (deleteButton) {
+          if (!confirm("Удалить товар?")) return;
+          try {
+            await api.deleteProduct(deleteButton.dataset.delete);
+            await Promise.all([loadProducts(), loadStats()]);
+          } catch (err) { alert(err.message || "Не удалось удалить товар"); }
+        }
+        if (editButton) {
+          const name = prompt("Новое название товара:");
+          if (!name) return;
+          const price = prompt("Новая цена:");
+          const stock = prompt("Новый остаток:");
+          try {
+            await api.updateProduct(editButton.dataset.edit, {
+              name,
+              ...(price ? { price: Number(price) } : {}),
+              ...(stock !== null && stock !== "" ? { stock: Number(stock) } : {}),
+            });
+            await loadProducts();
+          } catch (err) { alert(err.message || "Не удалось изменить товар"); }
+        }
+      });
+
+      document.getElementById("ordersBody").addEventListener("change", async (event) => {
+        const select = event.target.closest("[data-status-order]");
+        if (!select) return;
+        try { await api.updateSellerOrderStatus(select.dataset.statusOrder, select.value); }
+        catch (err) { alert(err.message || "Не удалось изменить статус"); }
+      });
+
       document.getElementById("newProductBtn").addEventListener("click", () => {
         document.getElementById("productForm").style.display = "block";
       });
@@ -223,7 +293,7 @@
             name: document.getElementById("pName").value.trim(),
             price: parseFloat(document.getElementById("pPrice").value),
             stock: parseInt(document.getElementById("pStock").value, 10) || 0,
-            category: document.getElementById("pCategory").value.trim(),
+            category: parseInt(document.getElementById("pCategory").value, 10),
             description: document.getElementById("pDesc").value.trim(),
           };
           if (!payload.name || !payload.price) {
@@ -234,10 +304,11 @@
           btn.disabled = true;
           btn.textContent = "Сохраняем…";
           try {
-            await api.createProduct(payload);
+            const product = await api.createProduct(payload);
+            const image = document.getElementById("pImage").files[0];
+            if (image) await api.uploadProductImage(product.id, image);
             document.getElementById("productForm").style.display = "none";
-            loadProducts();
-            loadStats();
+            await Promise.all([loadProducts(), loadStats()]);
           } catch (err) {
             alert(err.message || "Не удалось создать товар");
           } finally {
@@ -246,8 +317,7 @@
           }
         });
 
-      loadStats();
-      loadProducts();
+      initSeller();
     </script>
   </body>
 </html>

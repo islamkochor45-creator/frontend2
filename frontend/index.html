@@ -28,12 +28,16 @@
     <main class="wrap">
       <div class="filters">
         <h1>Каталог</h1>
+        <div class="catalog-tools">
+          <input id="searchInput" type="search" placeholder="Поиск товаров" />
+          <select id="sortSelect">
+            <option value="name">По названию</option>
+            <option value="price">Сначала дешевле</option>
+            <option value="-price">Сначала дороже</option>
+          </select>
+        </div>
         <div class="chips" id="chips">
           <button class="chip active" data-cat="">Всё</button>
-          <button class="chip" data-cat="handmade">Хендмейд</button>
-          <button class="chip" data-cat="home">Дом</button>
-          <button class="chip" data-cat="clothes">Одежда</button>
-          <button class="chip" data-cat="vintage">Винтаж</button>
         </div>
       </div>
 
@@ -53,11 +57,18 @@
       const grid = document.getElementById("grid");
       const fmt = (n) => new Intl.NumberFormat("ru-RU").format(n) + " ₽";
       let currentCat = "";
+      let searchTimer;
 
       async function loadProducts() {
         grid.innerHTML = '<div class="state-msg">Загружаем товары…</div>';
         try {
-          const params = currentCat ? { category: currentCat } : {};
+          const params = {
+            ...(currentCat ? { category: currentCat } : {}),
+            ...(document.getElementById("searchInput").value.trim()
+              ? { search: document.getElementById("searchInput").value.trim() }
+              : {}),
+            ordering: document.getElementById("sortSelect").value,
+          };
           const data = await api.getProducts(params);
           // ожидаем либо { results: [...] } (пагинация DRF), либо просто массив
           const items = Array.isArray(data) ? data : data.results || [];
@@ -160,6 +171,24 @@
         loadProducts();
       });
 
+      document.getElementById("searchInput").addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(loadProducts, 300);
+      });
+      document.getElementById("sortSelect").addEventListener("change", loadProducts);
+
+      async function loadCategories() {
+        try {
+          const data = await api.getCategories();
+          const categories = Array.isArray(data) ? data : data.results || [];
+          document.getElementById("chips").insertAdjacentHTML(
+            "beforeend",
+            categories.map((category) => `<button class="chip" data-cat="${category.id}">${category.name}</button>`).join(""),
+          );
+        } catch (_) {}
+      }
+
+      loadCategories();
       loadProducts();
     </script>
   </body>

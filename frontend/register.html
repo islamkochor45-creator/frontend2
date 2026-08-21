@@ -24,7 +24,7 @@
 <main class="auth-shell">
   <div class="auth-card">
     <h1>Регистрация</h1>
-    <p class="hint">Создайте аккаунт, чтобы покупать и добавлять товары в избранное</p>
+    <p class="hint">Создайте аккаунт покупателя или продавца</p>
 
     <div class="form-error" id="formError"></div>
     <div class="form-success" id="formSuccess">Готово! Проверьте почту для подтверждения и войдите в аккаунт.</div>
@@ -45,6 +45,17 @@
         <input type="password" id="password2" name="password2" required autocomplete="new-password">
         <div class="field-error">Пароли не совпадают</div>
       </div>
+      <div class="field">
+        <label for="role">Тип аккаунта</label>
+        <select id="role" name="role">
+          <option value="buyer">Покупатель</option>
+          <option value="seller">Продавец</option>
+        </select>
+      </div>
+      <div class="field" id="companyField" style="display:none;">
+        <label for="companyName">Название магазина</label>
+        <input type="text" id="companyName" name="company_name" autocomplete="organization">
+      </div>
       <button type="submit" class="btn-primary" style="width:100%;" id="submitBtn">Создать аккаунт</button>
     </form>
 
@@ -64,6 +75,12 @@
   const formError = document.getElementById('formError');
   const formSuccess = document.getElementById('formSuccess');
   const submitBtn = document.getElementById('submitBtn');
+  const role = document.getElementById('role');
+  const companyField = document.getElementById('companyField');
+
+  role.addEventListener('change', () => {
+    companyField.style.display = role.value === 'seller' ? 'block' : 'none';
+  });
 
   function setFieldError(fieldId, has) {
     document.getElementById(fieldId).classList.toggle('error', has);
@@ -104,6 +121,8 @@
         email: document.getElementById('email').value.trim(),
         password: document.getElementById('password').value,
         password2: document.getElementById('password2').value,
+        role: role.value,
+        company_name: document.getElementById('companyName').value.trim(),
       });
       formSuccess.classList.add('show');
       form.reset();

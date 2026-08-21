@@ -242,6 +242,33 @@ main {
   outline: none;
   border-color: var(--gold);
 }
+.field select,
+.catalog-tools input,
+.catalog-tools select,
+.new-address-form input[type="file"] {
+  padding: 13px 14px;
+  border-radius: 10px;
+  background: var(--ink);
+  border: 1px solid var(--line);
+  color: var(--bone);
+  font-family: "Manrope", sans-serif;
+  font-size: 14px;
+}
+.field select {
+  width: 100%;
+}
+.catalog-tools {
+  display: flex;
+  gap: 12px;
+  margin: 18px 0;
+}
+.catalog-tools input {
+  flex: 1;
+  min-width: 0;
+}
+.catalog-tools select {
+  width: 190px;
+}
 .field-error {
   color: var(--danger);
   font-size: 12px;

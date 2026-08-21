@@ -6,6 +6,8 @@ export async function initHeader() {
   const userSlot = document.getElementById('userSlot');
   const cartBadge = document.getElementById('cartBadge');
 
+  if (!userSlot) return;
+
   if (api.isLoggedIn()) {
     try {
       const me = await api.me();

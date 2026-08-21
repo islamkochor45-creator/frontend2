@@ -419,6 +419,7 @@
             amount: orderTotal,
           });
 
+          await api.sendPurchaseMessage(order.id);
           console.log("Платёж создан:", payment);
 
           window.location.href = `order-success.html?id=${order.id}`;

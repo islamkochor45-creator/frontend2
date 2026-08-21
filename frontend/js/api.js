@@ -41,10 +41,12 @@ function isAuthEndpoint(path) {
 
 // -------------------- Низкоуровневый fetch с авто-refresh --------------------
 async function request(path, options = {}, retry = true) {
+  const isFormData = options.body instanceof FormData;
   const headers = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(options.headers || {}),
   };
+  if (isFormData) delete headers["Content-Type"];
   const token = getAccessToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -131,6 +133,18 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  requestPasswordReset(email) {
+    return request("/auth/password-reset/", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+  confirmPasswordReset(payload) {
+    return request("/auth/password-reset-confirm/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
   async login(payload) {
     // payload: { email, password }
     // На всякий случай чистим токены от предыдущей сессии перед новой
@@ -165,6 +179,9 @@ export const api = {
   getProducts(params = {}) {
     const qs = new URLSearchParams(params).toString();
     return request(`/catalog/products/${qs ? `?${qs}` : ""}`);
+  },
+  getCategories() {
+    return request("/catalog/categories/");
   },
   getProduct(id) {
     return request(`/catalog/products/${id}/`);
@@ -243,7 +260,8 @@ export const api = {
 
   // --- Отзывы ---
   getReviews(productId) {
-    return request(`/reviews/`);
+    const query = productId ? `?product=${encodeURIComponent(productId)}` : "";
+    return request(`/reviews/${query}`);
   },
   createReview(productId, payload) {
     return request(`/reviews/`, {
@@ -254,25 +272,53 @@ export const api = {
 
   // --- Кабинет продавца ---
   getMyProducts() {
-    return request("/catalog/products/");
+    return request("/catalog/seller/products/");
   },
   createProduct(payload) {
-    return request("/catalog/products/", {
+    return request("/catalog/seller/products/", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
   updateProduct(id, payload) {
-    return request(`/catalog/products/${id}/`, {
+    return request(`/catalog/seller/products/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
   },
+  deleteProduct(id) {
+    return request(`/catalog/seller/products/${id}/`, { method: "DELETE" });
+  },
+  uploadProductImage(productId, file, altText = "") {
+    const form = new FormData();
+    form.append("image", file);
+    form.append("alt_text", altText);
+    return request(`/catalog/seller/products/${productId}/images/`, {
+      method: "POST",
+      headers: {},
+      body: form,
+    });
+  },
+  getSellerProfile() {
+    return request("/catalog/seller/profile/");
+  },
+  updateSellerProfile(payload) {
+    return request("/catalog/seller/profile/", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+  updateSellerOrderStatus(orderId, status) {
+    return request(`/catalog/seller/orders/${orderId}/status/`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  },
   getSellerOrders() {
-    return request("/catalog/sellers/");
+    return request("/catalog/seller/orders/");
   },
   getSellerStats() {
-    return request("/catalog/sellers/");
+    return request("/catalog/seller/stats/");
   },
 
   // --- Уведомления ---

@@ -214,6 +214,12 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  sendPurchaseMessage(orderId) {
+    return request("/orders/send_message/", {
+      method: "POST",
+      body: JSON.stringify({ order_id: orderId }),
+    });
+  },
   getOrders() {
     return request("/orders/");
   },
